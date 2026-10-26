@@ -5,7 +5,7 @@ const schema = "teste_" + randomUUID().replaceAll("-", "");
 // Ignora a URL do .env para nunca limpar ou testar o banco publicado na Neon.
 const resultado = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--test", "--test-concurrency=1", "tests/regras.test.ts"],
+  ["--import", "tsx", "--test", "--test-concurrency=1", "tests/origens.test.ts", "tests/regras.test.ts"],
   {
     stdio: "inherit",
     env: {

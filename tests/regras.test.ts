@@ -701,6 +701,29 @@ function hoje() {
   return new Date().toISOString().slice(0, 10);
 }
 
+test("Login na origem oficial em ambiente Vercel mantém cookie Secure, HttpOnly e SameSite", async () => {
+  const anterior = process.env.VERCEL;
+  try {
+    process.env.VERCEL = "1";
+    const r = await request(app)
+      .post("/api/login")
+      .set("Origin", "https://clinica-medica-xi-eight.vercel.app")
+      .set(header)
+      .send({
+        email: "admin@clinica.local",
+        senha: process.env.DEMO_PASSWORD ?? "Clinica@2026",
+      });
+    assert.equal(r.status, 200, r.text);
+    const cookie = String(r.headers["set-cookie"]);
+    assert.match(cookie, /; Secure/);
+    assert.match(cookie, /; HttpOnly/);
+    assert.match(cookie, /; SameSite=Strict/);
+  } finally {
+    if (anterior === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = anterior;
+  }
+});
+
 test("Agenda valida intervalo, unidade e situação sem confundir parâmetros com falha de banco", async () => {
   const base = {
     inicio: "2027-05-10T00:00:00-03:00",

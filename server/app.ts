@@ -13,35 +13,14 @@ import { cadastros } from "./cadastros.js";
 import { agendaRouter } from "./agenda.js";
 import { clinica } from "./clinica.js";
 import { financeiro } from "./financeiro.js";
+import { protegerOrigem, ambientePublicado } from "./origens.js";
 export const app = express();
 const hashInexistente = bcrypt.hashSync("senha-inexistente-publica", 12);
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(express.json({ limit: "128kb" }));
 app.use(cookieParser());
-app.use("/api", (req, _res, next) => {
-  if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    const origem = req.get("origin");
-    const permitidas = [
-      process.env.APP_ORIGIN,
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:3001",
-      "http://127.0.0.1:3001",
-    ];
-    exigir(
-      !origem || permitidas.includes(origem),
-      "Origem da requisição não permitida.",
-      403,
-    );
-    exigir(
-      req.get("x-clinica-client") === "web",
-      "Cabeçalho de proteção obrigatório.",
-      403,
-    );
-  }
-  next();
-});
+app.use("/api", protegerOrigem());
 app.get("/api/saude", async (_req, res) => {
   await db.$queryRaw`SELECT 1`;
   res.json({ status: "ok" });
@@ -79,7 +58,7 @@ app.post(
     res.cookie("sessao", token, {
       httpOnly: true,
       sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
+      secure: ambientePublicado(process.env),
       maxAge: 8 * 3600000,
       path: "/",
     });
