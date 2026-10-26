@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: clinica
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinica_local}
+      POSTGRES_DB: clinica
+    ports: ["127.0.0.1:54329:5432"]
+    volumes: ["clinica_dados:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinica"]
+      interval: 5s
+      retries: 10
+volumes:
+  clinica_dados:

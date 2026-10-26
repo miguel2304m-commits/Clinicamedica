@@ -1,0 +1,260 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam class {
+ BackgroundColor #F0F7F3
+ BorderColor #598574
+}
+hide empty methods
+title Clínica Integrada — modelo relacional completo
+entity Paciente {
+  id: Int <<PK>>
+  cpf: String <<UQ>> @db.VarChar(11)
+  nome: String
+  nascimento: DateTime @db.Date
+  sexo: String
+  telefone: String
+  email: String
+  endereco: String
+  criadoEm: DateTime
+}
+entity Prontuario {
+  id: Int <<PK>>
+  pacienteId: Int <<UQ>>
+  criadoEm: DateTime
+}
+entity Alergia {
+  id: Int <<PK>>
+  nome: String <<UQ>>
+  descricao: String
+}
+entity PacienteAlergia {
+  pacienteId: Int
+  alergiaId: Int
+  observacoes: String
+}
+entity Profissional {
+  id: Int <<PK>>
+  nome: String
+  cpf: String <<UQ>> @db.VarChar(11)
+  telefone: String
+  email: String
+  nascimento: DateTime @db.Date
+  registro: String
+}
+entity Medico {
+  profissionalId: Int <<PK>>
+  crm: String
+  ufCrm: String @db.VarChar(2)
+}
+entity Especialidade {
+  id: Int <<PK>>
+  nome: String <<UQ>>
+  descricao: String
+}
+entity MedicoEspecialidade {
+  medicoId: Int
+  especialidadeId: Int
+}
+entity Unidade {
+  id: Int <<PK>>
+  nome: String
+  endereco: String
+  telefone: String
+  horario: String
+}
+entity ProfissionalUnidade {
+  profissionalId: Int
+  unidadeId: Int
+}
+entity UnidadeEspecialidade {
+  unidadeId: Int
+  especialidadeId: Int
+}
+entity Convenio {
+  id: Int <<PK>>
+  nome: String
+  cnpj: String <<UQ>> @db.VarChar(14)
+  telefone: String
+}
+entity PacienteConvenio {
+  id: Int <<PK>>
+  pacienteId: Int
+  convenioId: Int
+  carteirinha: String
+  adesao: DateTime @db.Date
+  ativo: Boolean
+}
+entity Agendamento {
+  id: Int <<PK>>
+  pacienteId: Int
+  medicoId: Int
+  unidadeId: Int
+  especialidadeId: Int
+  pacienteConvenioId: Int?
+  convenioHistorico: String?
+  inicio: DateTime @db.Timestamptz(3)
+  fim: DateTime @db.Timestamptz(3)
+  situacao: SituacaoAgenda
+  observacoes: String
+}
+entity Consulta {
+  id: Int <<PK>>
+  agendamentoId: Int <<UQ>>
+  pacienteId: Int
+  medicoId: Int
+  unidadeId: Int
+  especialidadeId: Int
+  data: DateTime @db.Timestamptz(3)
+  queixa: String
+  observacoes: String
+  diagnostico: String
+  conduta: String
+}
+entity Exame {
+  id: Int <<PK>>
+  nome: String
+  descricao: String
+  tipo: String
+}
+entity SolicitacaoExame {
+  id: Int <<PK>>
+  pacienteId: Int
+  consultaId: Int
+  exameId: Int
+  solicitadoEm: DateTime @db.Timestamptz(3)
+  situacao: SituacaoExame
+  realizadoEm: DateTime? @db.Timestamptz(3)
+  resultado: String?
+}
+entity Medicamento {
+  id: Int <<PK>>
+  nome: String
+  principioAtivo: String
+  fabricante: String
+  apresentacao: String
+}
+entity Prescricao {
+  id: Int <<PK>>
+  consultaId: Int
+  data: DateTime
+}
+entity ItemPrescricao {
+  id: Int <<PK>>
+  prescricaoId: Int
+  medicamentoId: Int
+  quantidade: Int
+  dose: String
+  frequencia: String
+  duracao: String
+  observacoes: String
+}
+entity Procedimento {
+  id: Int <<PK>>
+  nome: String
+  descricao: String
+  valorPadrao: Decimal @db.Decimal(12, 2)
+}
+entity ProcedimentoRealizado {
+  id: Int <<PK>>
+  consultaId: Int
+  procedimentoId: Int
+  profissionalId: Int
+  data: DateTime @db.Timestamptz(3)
+  valorCobrado: Decimal @db.Decimal(12, 2)
+}
+entity Cobranca {
+  id: Int <<PK>>
+  consultaId: Int
+  procedimentoRealizadoId: Int?
+  pacienteConvenioId: Int?
+  grupo: String
+  origem: String
+  valor: Decimal @db.Decimal(12, 2)
+  responsavel: Responsavel
+  vencimento: DateTime @db.Date
+  emitidaEm: DateTime @db.Timestamptz(3)
+  situacao: SituacaoCobranca
+}
+entity Pagamento {
+  id: Int <<PK>>
+  cobrancaId: Int
+  data: DateTime @db.Timestamptz(3)
+  valor: Decimal @db.Decimal(12, 2)
+  forma: FormaPagamento
+  situacao: SituacaoPagamento
+  chave: String <<UQ>>
+}
+entity Usuario {
+  id: Int <<PK>>
+  nome: String
+  email: String <<UQ>>
+  senhaHash: String
+  perfil: Perfil
+  ativo: Boolean
+  profissionalId: Int? <<UQ>>
+}
+entity Sessao {
+  id: String <<PK>>
+  usuarioId: Int
+  expiraEm: DateTime
+}
+entity Auditoria {
+  id: Int <<PK>>
+  usuarioId: Int?
+  acao: String
+  recurso: String
+  recursoId: String?
+  data: DateTime
+}
+entity AnotacaoEnfermagem {
+  id: Int <<PK>>
+  prontuarioId: Int
+  profissionalId: Int
+  texto: String
+  data: DateTime
+}
+Prontuario "1" -- "1" Paciente : FK pacienteId
+PacienteAlergia "0..*" -- "1" Paciente : FK pacienteId
+PacienteAlergia "0..*" -- "1" Alergia : FK alergiaId
+Medico "0..1" -- "1" Profissional : FK profissionalId
+MedicoEspecialidade "1..*" -- "1" Medico : FK medicoId
+MedicoEspecialidade "0..*" -- "1" Especialidade : FK especialidadeId
+ProfissionalUnidade "0..*" -- "1" Profissional : FK profissionalId
+ProfissionalUnidade "0..*" -- "1" Unidade : FK unidadeId
+UnidadeEspecialidade "0..*" -- "1" Unidade : FK unidadeId
+UnidadeEspecialidade "0..*" -- "1" Especialidade : FK especialidadeId
+PacienteConvenio "0..*" -- "1" Paciente : FK pacienteId
+PacienteConvenio "0..*" -- "1" Convenio : FK convenioId
+Agendamento "0..*" -- "1" Paciente : FK pacienteId
+Agendamento "0..*" -- "1" Medico : FK medicoId
+Agendamento "0..*" -- "1" Unidade : FK unidadeId
+Agendamento "0..*" -- "1" Especialidade : FK especialidadeId
+Agendamento "0..*" -- "0..1" PacienteConvenio : FK pacienteConvenioId
+Consulta "0..1" -- "1" Agendamento : FK agendamentoId
+Consulta "0..*" -- "1" Paciente : FK pacienteId
+Consulta "0..*" -- "1" Medico : FK medicoId
+Consulta "0..*" -- "1" Unidade : FK unidadeId
+Consulta "0..*" -- "1" Especialidade : FK especialidadeId
+SolicitacaoExame "0..*" -- "1" Paciente : FK pacienteId
+SolicitacaoExame "0..*" -- "1" Consulta : FK consultaId,pacienteId
+SolicitacaoExame "0..*" -- "1" Exame : FK exameId
+Prescricao "0..*" -- "1" Consulta : FK consultaId
+ItemPrescricao "1..*" -- "1" Prescricao : FK prescricaoId
+ItemPrescricao "0..*" -- "1" Medicamento : FK medicamentoId
+ProcedimentoRealizado "0..*" -- "1" Consulta : FK consultaId
+ProcedimentoRealizado "0..*" -- "1" Procedimento : FK procedimentoId
+ProcedimentoRealizado "0..*" -- "1" Profissional : FK profissionalId
+Cobranca "0..*" -- "1" Consulta : FK consultaId
+Cobranca "0..*" -- "0..1" ProcedimentoRealizado : FK procedimentoRealizadoId
+Cobranca "0..*" -- "0..1" PacienteConvenio : FK pacienteConvenioId
+Pagamento "0..*" -- "1" Cobranca : FK cobrancaId
+Usuario "0..1" -- "0..1" Profissional : FK profissionalId
+Sessao "0..*" -- "1" Usuario : FK usuarioId
+Auditoria "0..*" -- "0..1" Usuario : FK usuarioId
+AnotacaoEnfermagem "0..*" -- "1" Prontuario : FK prontuarioId
+AnotacaoEnfermagem "0..*" -- "1" Profissional : FK profissionalId
+@enduml

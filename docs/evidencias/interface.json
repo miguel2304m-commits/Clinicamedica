@@ -1,0 +1,15 @@
+{
+  "data": "2026-10-26T17:06:10.945Z",
+  "navegador": "Microsoft Edge headless via Playwright",
+  "resultados": [
+    "Login e dashboard com métricas do PostgreSQL",
+    "Agenda diária e semanal",
+    "Pesquisa de pacientes e bloqueio de aba clínica administrativa",
+    "Formulário real de paciente com validação e persistência",
+    "Relatórios e exportação CSV",
+    "Médico acessa histórico e prescreve dois itens pela interface",
+    "Responsividade a 390 px e navegação por menu",
+    "Verificação automatizada de acessibilidade do dashboard"
+  ],
+  "erros": []
+}

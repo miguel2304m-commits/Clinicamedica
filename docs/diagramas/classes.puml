@@ -1,0 +1,330 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam class {
+ BackgroundColor #F0F7F3
+ BorderColor #598574
+}
+hide empty methods
+title Clínica Integrada — visão completa de classes
+class Paciente {
+  id: Int <<PK>>
+  cpf: String <<UQ>> @db.VarChar(11)
+  nome: String
+  nascimento: DateTime @db.Date
+  sexo: String
+  telefone: String
+  email: String
+  endereco: String
+  criadoEm: DateTime
+}
+class Prontuario {
+  id: Int <<PK>>
+  pacienteId: Int <<UQ>>
+  criadoEm: DateTime
+}
+class Alergia {
+  id: Int <<PK>>
+  nome: String <<UQ>>
+  descricao: String
+}
+class PacienteAlergia <<associativa>> {
+  pacienteId: Int
+  alergiaId: Int
+  observacoes: String
+}
+class Profissional {
+  id: Int <<PK>>
+  nome: String
+  cpf: String <<UQ>> @db.VarChar(11)
+  telefone: String
+  email: String
+  nascimento: DateTime @db.Date
+  registro: String
+}
+class Medico {
+  profissionalId: Int <<PK>>
+  crm: String
+  ufCrm: String @db.VarChar(2)
+}
+class Especialidade {
+  id: Int <<PK>>
+  nome: String <<UQ>>
+  descricao: String
+}
+class MedicoEspecialidade <<associativa>> {
+  medicoId: Int
+  especialidadeId: Int
+}
+class Unidade {
+  id: Int <<PK>>
+  nome: String
+  endereco: String
+  telefone: String
+  horario: String
+}
+class ProfissionalUnidade <<associativa>> {
+  profissionalId: Int
+  unidadeId: Int
+}
+class UnidadeEspecialidade <<associativa>> {
+  unidadeId: Int
+  especialidadeId: Int
+}
+class Convenio {
+  id: Int <<PK>>
+  nome: String
+  cnpj: String <<UQ>> @db.VarChar(14)
+  telefone: String
+}
+class PacienteConvenio <<associativa>> {
+  id: Int <<PK>>
+  pacienteId: Int
+  convenioId: Int
+  carteirinha: String
+  adesao: DateTime @db.Date
+  ativo: Boolean
+}
+class Agendamento {
+  id: Int <<PK>>
+  pacienteId: Int
+  medicoId: Int
+  unidadeId: Int
+  especialidadeId: Int
+  pacienteConvenioId: Int?
+  convenioHistorico: String?
+  inicio: DateTime @db.Timestamptz(3)
+  fim: DateTime @db.Timestamptz(3)
+  situacao: SituacaoAgenda
+  observacoes: String
+}
+class Consulta {
+  id: Int <<PK>>
+  agendamentoId: Int <<UQ>>
+  pacienteId: Int
+  medicoId: Int
+  unidadeId: Int
+  especialidadeId: Int
+  data: DateTime @db.Timestamptz(3)
+  queixa: String
+  observacoes: String
+  diagnostico: String
+  conduta: String
+}
+class Exame {
+  id: Int <<PK>>
+  nome: String
+  descricao: String
+  tipo: String
+}
+class SolicitacaoExame {
+  id: Int <<PK>>
+  pacienteId: Int
+  consultaId: Int
+  exameId: Int
+  solicitadoEm: DateTime @db.Timestamptz(3)
+  situacao: SituacaoExame
+  realizadoEm: DateTime? @db.Timestamptz(3)
+  resultado: String?
+}
+class Medicamento {
+  id: Int <<PK>>
+  nome: String
+  principioAtivo: String
+  fabricante: String
+  apresentacao: String
+}
+class Prescricao {
+  id: Int <<PK>>
+  consultaId: Int
+  data: DateTime
+}
+class ItemPrescricao {
+  id: Int <<PK>>
+  prescricaoId: Int
+  medicamentoId: Int
+  quantidade: Int
+  dose: String
+  frequencia: String
+  duracao: String
+  observacoes: String
+}
+class Procedimento {
+  id: Int <<PK>>
+  nome: String
+  descricao: String
+  valorPadrao: Decimal @db.Decimal(12, 2)
+}
+class ProcedimentoRealizado {
+  id: Int <<PK>>
+  consultaId: Int
+  procedimentoId: Int
+  profissionalId: Int
+  data: DateTime @db.Timestamptz(3)
+  valorCobrado: Decimal @db.Decimal(12, 2)
+}
+class Cobranca {
+  id: Int <<PK>>
+  consultaId: Int
+  procedimentoRealizadoId: Int?
+  pacienteConvenioId: Int?
+  grupo: String
+  origem: String
+  valor: Decimal @db.Decimal(12, 2)
+  responsavel: Responsavel
+  vencimento: DateTime @db.Date
+  emitidaEm: DateTime @db.Timestamptz(3)
+  situacao: SituacaoCobranca
+}
+class Pagamento {
+  id: Int <<PK>>
+  cobrancaId: Int
+  data: DateTime @db.Timestamptz(3)
+  valor: Decimal @db.Decimal(12, 2)
+  forma: FormaPagamento
+  situacao: SituacaoPagamento
+  chave: String <<UQ>>
+}
+class Usuario {
+  id: Int <<PK>>
+  nome: String
+  email: String <<UQ>>
+  senhaHash: String
+  perfil: Perfil
+  ativo: Boolean
+  profissionalId: Int? <<UQ>>
+}
+class Sessao {
+  id: String <<PK>>
+  usuarioId: Int
+  expiraEm: DateTime
+}
+class Auditoria {
+  id: Int <<PK>>
+  usuarioId: Int?
+  acao: String
+  recurso: String
+  recursoId: String?
+  data: DateTime
+}
+class AnotacaoEnfermagem {
+  id: Int <<PK>>
+  prontuarioId: Int
+  profissionalId: Int
+  texto: String
+  data: DateTime
+}
+enum Perfil {
+  ADMINISTRADOR
+  RECEPCIONISTA
+  MEDICO
+  ENFERMAGEM
+  FINANCEIRO
+}
+enum SituacaoAgenda {
+  AGENDADO
+  CONFIRMADO
+  REALIZADO
+  CANCELADO
+  NAO_COMPARECEU
+}
+enum SituacaoExame {
+  SOLICITADO
+  AGENDADO
+  REALIZADO
+  CANCELADO
+}
+enum Responsavel {
+  PACIENTE
+  CONVENIO
+}
+enum FormaPagamento {
+  DINHEIRO
+  CREDITO
+  DEBITO
+  PIX
+  CONVENIO
+}
+enum SituacaoPagamento {
+  RECEBIDO
+  ESTORNADO
+}
+enum SituacaoCobranca {
+  ABERTA
+  PARCIAL
+  QUITADA
+  CANCELADA
+}
+Prontuario "1" -- "1" Paciente : pacienteId
+PacienteAlergia "0..*" -- "1" Paciente : pacienteId
+PacienteAlergia "0..*" -- "1" Alergia : alergiaId
+Medico --|> Profissional : especialização por PK compartilhada
+MedicoEspecialidade "1..*" -- "1" Medico : medicoId
+MedicoEspecialidade "0..*" -- "1" Especialidade : especialidadeId
+ProfissionalUnidade "0..*" -- "1" Profissional : profissionalId
+ProfissionalUnidade "0..*" -- "1" Unidade : unidadeId
+UnidadeEspecialidade "0..*" -- "1" Unidade : unidadeId
+UnidadeEspecialidade "0..*" -- "1" Especialidade : especialidadeId
+PacienteConvenio "0..*" -- "1" Paciente : pacienteId
+PacienteConvenio "0..*" -- "1" Convenio : convenioId
+Agendamento "0..*" -- "1" Paciente : pacienteId
+Agendamento "0..*" -- "1" Medico : medicoId
+Agendamento "0..*" -- "1" Unidade : unidadeId
+Agendamento "0..*" -- "1" Especialidade : especialidadeId
+Agendamento "0..*" -- "0..1" PacienteConvenio : pacienteConvenioId
+Consulta "0..1" -- "1" Agendamento : agendamentoId
+Consulta "0..*" -- "1" Paciente : pacienteId
+Consulta "0..*" -- "1" Medico : medicoId
+Consulta "0..*" -- "1" Unidade : unidadeId
+Consulta "0..*" -- "1" Especialidade : especialidadeId
+SolicitacaoExame "0..*" -- "1" Paciente : pacienteId
+SolicitacaoExame "0..*" -- "1" Consulta : consultaId,pacienteId
+SolicitacaoExame "0..*" -- "1" Exame : exameId
+Prescricao "0..*" -- "1" Consulta : consultaId
+Prescricao "1" *-- "1..*" ItemPrescricao
+ItemPrescricao "0..*" -- "1" Medicamento : medicamentoId
+ProcedimentoRealizado "0..*" -- "1" Consulta : consultaId
+ProcedimentoRealizado "0..*" -- "1" Procedimento : procedimentoId
+ProcedimentoRealizado "0..*" -- "1" Profissional : profissionalId
+Cobranca "0..*" -- "1" Consulta : consultaId
+Cobranca "0..*" -- "0..1" ProcedimentoRealizado : procedimentoRealizadoId
+Cobranca "0..*" -- "0..1" PacienteConvenio : pacienteConvenioId
+Pagamento "0..*" -- "1" Cobranca : cobrancaId
+Usuario "0..1" -- "0..1" Profissional : profissionalId
+Sessao "0..*" -- "1" Usuario : usuarioId
+Auditoria "0..*" -- "0..1" Usuario : usuarioId
+AnotacaoEnfermagem "0..*" -- "1" Prontuario : prontuarioId
+AnotacaoEnfermagem "0..*" -- "1" Profissional : profissionalId
+class ServicoAgenda <<serviço>> {
+ +validarAgenda(tx, entrada, ignorarId): Promise
+ +reagendar(id, entrada): Agendamento
+ +realizarConsulta(entrada): Consulta
+}
+class ServicoFinanceiro <<serviço>> {
+ +saldo(tx, cobrancaId): Saldo
+ +emitirCobrancas(entrada): Cobranca[]
+ +receberPagamento(entrada): Pagamento
+ +estornar(id): Pagamento
+}
+class ControleAcesso <<serviço>> {
+ +escopoPaciente(usuario, pacienteId): void
+ +consultaPropria(usuario, consultaId): Consulta
+ +auditar(tx, usuario, acao, recurso): void
+}
+ServicoAgenda ..> Agendamento
+ServicoAgenda ..> Consulta
+ServicoFinanceiro ..> Cobranca
+ServicoFinanceiro ..> Pagamento
+ControleAcesso ..> Usuario
+note bottom of Prontuario
+Exatamente um por paciente, validado por
+UNIQUE + trigger diferida no PostgreSQL.
+end note
+note bottom of ServicoAgenda
+Serviços representam funções e handlers Express,
+não classes instanciadas do TypeScript.
+end note
+@enduml

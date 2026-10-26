@@ -1,0 +1,10 @@
+{
+  "violacoes": [],
+  "incompletos": [
+    {
+      "id": "color-contrast",
+      "descricao": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds"
+    }
+  ],
+  "aprovados": 14
+}

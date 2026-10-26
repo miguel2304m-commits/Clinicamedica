@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Perfil {
+  ADMINISTRADOR
+  RECEPCIONISTA
+  MEDICO
+  ENFERMAGEM
+  FINANCEIRO
+}
+
+enum SituacaoAgenda {
+  AGENDADO
+  CONFIRMADO
+  REALIZADO
+  CANCELADO
+  NAO_COMPARECEU
+}
+
+enum SituacaoExame {
+  SOLICITADO
+  AGENDADO
+  REALIZADO
+  CANCELADO
+}
+
+enum Responsavel {
+  PACIENTE
+  CONVENIO
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  CREDITO
+  DEBITO
+  PIX
+  CONVENIO
+}
+
+enum SituacaoPagamento {
+  RECEBIDO
+  ESTORNADO
+}
+
+enum SituacaoCobranca {
+  ABERTA
+  PARCIAL
+  QUITADA
+  CANCELADA
+}
+
+model Paciente {
+  id           Int                @id @default(autoincrement())
+  cpf          String             @unique @db.VarChar(11)
+  nome         String
+  nascimento   DateTime           @db.Date
+  sexo         String
+  telefone     String
+  email        String
+  endereco     String
+  criadoEm     DateTime           @default(now())
+  prontuario   Prontuario?
+  alergias     PacienteAlergia[]
+  convenios    PacienteConvenio[]
+  agendamentos Agendamento[]
+  consultas    Consulta[]
+  exames       SolicitacaoExame[]
+
+  @@index([nome])
+}
+
+model Prontuario {
+  id         Int                  @id @default(autoincrement())
+  pacienteId Int                  @unique
+  paciente   Paciente             @relation(fields: [pacienteId], references: [id], onDelete: Restrict)
+  criadoEm   DateTime             @default(now())
+  anotacoes  AnotacaoEnfermagem[]
+}
+
+model Alergia {
+  id        Int               @id @default(autoincrement())
+  nome      String            @unique
+  descricao String
+  pacientes PacienteAlergia[]
+}
+
+model PacienteAlergia {
+  pacienteId  Int
+  alergiaId   Int
+  observacoes String
+  paciente    Paciente @relation(fields: [pacienteId], references: [id])
+  alergia     Alergia  @relation(fields: [alergiaId], references: [id])
+
+  @@id([pacienteId, alergiaId])
+}
+
+model Profissional {
+  id            Int                     @id @default(autoincrement())
+  nome          String
+  cpf           String                  @unique @db.VarChar(11)
+  telefone      String
+  email         String
+  nascimento    DateTime                @db.Date
+  registro      String
+  medico        Medico?
+  unidades      ProfissionalUnidade[]
+  usuario       Usuario?
+  procedimentos ProcedimentoRealizado[]
+  anotacoes     AnotacaoEnfermagem[]
+}
+
+model Medico {
+  profissionalId Int                   @id
+  profissional   Profissional          @relation(fields: [profissionalId], references: [id])
+  crm            String
+  ufCrm          String                @db.VarChar(2)
+  especialidades MedicoEspecialidade[]
+  agendamentos   Agendamento[]
+  consultas      Consulta[]
+
+  @@unique([crm, ufCrm])
+}
+
+model Especialidade {
+  id           Int                    @id @default(autoincrement())
+  nome         String                 @unique
+  descricao    String
+  medicos      MedicoEspecialidade[]
+  unidades     UnidadeEspecialidade[]
+  agendamentos Agendamento[]
+  consultas    Consulta[]
+}
+
+model MedicoEspecialidade {
+  medicoId        Int
+  especialidadeId Int
+  medico          Medico        @relation(fields: [medicoId], references: [profissionalId])
+  especialidade   Especialidade @relation(fields: [especialidadeId], references: [id])
+
+  @@id([medicoId, especialidadeId])
+}
+
+model Unidade {
+  id             Int                    @id @default(autoincrement())
+  nome           String
+  endereco       String
+  telefone       String
+  horario        String
+  profissionais  ProfissionalUnidade[]
+  especialidades UnidadeEspecialidade[]
+  agendamentos   Agendamento[]
+  consultas      Consulta[]
+}
+
+model ProfissionalUnidade {
+  profissionalId Int
+  unidadeId      Int
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  unidade        Unidade      @relation(fields: [unidadeId], references: [id])
+
+  @@id([profissionalId, unidadeId])
+}
+
+model UnidadeEspecialidade {
+  unidadeId       Int
+  especialidadeId Int
+  unidade         Unidade       @relation(fields: [unidadeId], references: [id])
+  especialidade   Especialidade @relation(fields: [especialidadeId], references: [id])
+
+  @@id([unidadeId, especialidadeId])
+}
+
+model Convenio {
+  id        Int                @id @default(autoincrement())
+  nome      String
+  cnpj      String             @unique @db.VarChar(14)
+  telefone  String
+  pacientes PacienteConvenio[]
+}
+
+model PacienteConvenio {
+  id           Int           @id @default(autoincrement())
+  pacienteId   Int
+  convenioId   Int
+  carteirinha  String
+  adesao       DateTime      @db.Date
+  ativo        Boolean       @default(true)
+  paciente     Paciente      @relation(fields: [pacienteId], references: [id])
+  convenio     Convenio      @relation(fields: [convenioId], references: [id])
+  agendamentos Agendamento[]
+  cobrancas    Cobranca[]
+
+  @@unique([pacienteId, convenioId, carteirinha])
+}
+
+model Agendamento {
+  id                 Int               @id @default(autoincrement())
+  pacienteId         Int
+  medicoId           Int
+  unidadeId          Int
+  especialidadeId    Int
+  pacienteConvenioId Int?
+  convenioHistorico  String?
+  inicio             DateTime          @db.Timestamptz(3)
+  fim                DateTime          @db.Timestamptz(3)
+  situacao           SituacaoAgenda    @default(AGENDADO)
+  observacoes        String            @default("")
+  paciente           Paciente          @relation(fields: [pacienteId], references: [id])
+  medico             Medico            @relation(fields: [medicoId], references: [profissionalId])
+  unidade            Unidade           @relation(fields: [unidadeId], references: [id])
+  especialidade      Especialidade     @relation(fields: [especialidadeId], references: [id])
+  pacienteConvenio   PacienteConvenio? @relation(fields: [pacienteConvenioId], references: [id])
+  consulta           Consulta?
+
+  @@index([medicoId, inicio, fim])
+  @@index([pacienteId, inicio])
+  @@index([unidadeId, inicio])
+}
+
+model Consulta {
+  id              Int                     @id @default(autoincrement())
+  agendamentoId   Int                     @unique
+  pacienteId      Int
+  medicoId        Int
+  unidadeId       Int
+  especialidadeId Int
+  data            DateTime                @default(now()) @db.Timestamptz(3)
+  queixa          String
+  observacoes     String
+  diagnostico     String
+  conduta         String
+  agendamento     Agendamento             @relation(fields: [agendamentoId], references: [id])
+  paciente        Paciente                @relation(fields: [pacienteId], references: [id])
+  medico          Medico                  @relation(fields: [medicoId], references: [profissionalId])
+  unidade         Unidade                 @relation(fields: [unidadeId], references: [id])
+  especialidade   Especialidade           @relation(fields: [especialidadeId], references: [id])
+  exames          SolicitacaoExame[]
+  prescricoes     Prescricao[]
+  procedimentos   ProcedimentoRealizado[]
+  cobrancas       Cobranca[]
+
+  @@unique([id, pacienteId])
+  @@index([data, unidadeId, especialidadeId])
+}
+
+model Exame {
+  id           Int                @id @default(autoincrement())
+  nome         String
+  descricao    String
+  tipo         String
+  solicitacoes SolicitacaoExame[]
+}
+
+model SolicitacaoExame {
+  id           Int           @id @default(autoincrement())
+  pacienteId   Int
+  consultaId   Int
+  exameId      Int
+  solicitadoEm DateTime      @default(now()) @db.Timestamptz(3)
+  situacao     SituacaoExame @default(SOLICITADO)
+  realizadoEm  DateTime?     @db.Timestamptz(3)
+  resultado    String?
+  paciente     Paciente      @relation(fields: [pacienteId], references: [id])
+  consulta     Consulta      @relation(fields: [consultaId, pacienteId], references: [id, pacienteId])
+  exame        Exame         @relation(fields: [exameId], references: [id])
+
+  @@index([pacienteId, situacao])
+}
+
+model Medicamento {
+  id             Int              @id @default(autoincrement())
+  nome           String
+  principioAtivo String
+  fabricante     String
+  apresentacao   String
+  itens          ItemPrescricao[]
+}
+
+model Prescricao {
+  id         Int              @id @default(autoincrement())
+  consultaId Int
+  data       DateTime         @default(now())
+  consulta   Consulta         @relation(fields: [consultaId], references: [id])
+  itens      ItemPrescricao[]
+}
+
+model ItemPrescricao {
+  id            Int         @id @default(autoincrement())
+  prescricaoId  Int
+  medicamentoId Int
+  quantidade    Int
+  dose          String
+  frequencia    String
+  duracao       String
+  observacoes   String
+  prescricao    Prescricao  @relation(fields: [prescricaoId], references: [id], onDelete: Cascade)
+  medicamento   Medicamento @relation(fields: [medicamentoId], references: [id])
+}
+
+model Procedimento {
+  id          Int                     @id @default(autoincrement())
+  nome        String
+  descricao   String
+  valorPadrao Decimal                 @db.Decimal(12, 2)
+  realizacoes ProcedimentoRealizado[]
+}
+
+model ProcedimentoRealizado {
+  id             Int          @id @default(autoincrement())
+  consultaId     Int
+  procedimentoId Int
+  profissionalId Int
+  data           DateTime     @default(now()) @db.Timestamptz(3)
+  valorCobrado   Decimal      @db.Decimal(12, 2)
+  consulta       Consulta     @relation(fields: [consultaId], references: [id])
+  procedimento   Procedimento @relation(fields: [procedimentoId], references: [id])
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  cobrancas      Cobranca[]
+
+  @@index([data])
+}
+
+model Cobranca {
+  id                      Int                    @id @default(autoincrement())
+  consultaId              Int
+  procedimentoRealizadoId Int?
+  pacienteConvenioId      Int?
+  grupo                   String
+  origem                  String
+  valor                   Decimal                @db.Decimal(12, 2)
+  responsavel             Responsavel
+  vencimento              DateTime               @db.Date
+  emitidaEm               DateTime               @default(now()) @db.Timestamptz(3)
+  situacao                SituacaoCobranca       @default(ABERTA)
+  consulta                Consulta               @relation(fields: [consultaId], references: [id])
+  procedimentoRealizado   ProcedimentoRealizado? @relation(fields: [procedimentoRealizadoId], references: [id])
+  pacienteConvenio        PacienteConvenio?      @relation(fields: [pacienteConvenioId], references: [id])
+  pagamentos              Pagamento[]
+
+  @@unique([grupo, responsavel])
+  @@index([emitidaEm, situacao])
+}
+
+model Pagamento {
+  id         Int               @id @default(autoincrement())
+  cobrancaId Int
+  data       DateTime          @default(now()) @db.Timestamptz(3)
+  valor      Decimal           @db.Decimal(12, 2)
+  forma      FormaPagamento
+  situacao   SituacaoPagamento @default(RECEBIDO)
+  chave      String            @unique
+  cobranca   Cobranca          @relation(fields: [cobrancaId], references: [id])
+
+  @@index([data, situacao])
+}
+
+model Usuario {
+  id             Int           @id @default(autoincrement())
+  nome           String
+  email          String        @unique
+  senhaHash      String
+  perfil         Perfil
+  ativo          Boolean       @default(true)
+  profissionalId Int?          @unique
+  profissional   Profissional? @relation(fields: [profissionalId], references: [id])
+  sessoes        Sessao[]
+  auditorias     Auditoria[]
+}
+
+model Sessao {
+  id        String   @id
+  usuarioId Int
+  expiraEm  DateTime
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}
+
+model Auditoria {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int?
+  acao      String
+  recurso   String
+  recursoId String?
+  data      DateTime @default(now())
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([data])
+}
+
+model AnotacaoEnfermagem {
+  id             Int          @id @default(autoincrement())
+  prontuarioId   Int
+  profissionalId Int
+  texto          String
+  data           DateTime     @default(now())
+  prontuario     Prontuario   @relation(fields: [prontuarioId], references: [id])
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+}

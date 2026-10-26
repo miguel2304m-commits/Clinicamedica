@@ -1,0 +1,55 @@
+{
+  "name": "clinica-integrada",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "db:local": "node scripts/postgres.mjs",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "docs": "node scripts/documentar.mjs"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "5.2.8",
+    "@fontsource/manrope": "5.2.8",
+    "@prisma/client": "6.19.0",
+    "bcryptjs": "3.0.2",
+    "cookie-parser": "1.4.7",
+    "dotenv": "16.6.1",
+    "express": "5.1.0",
+    "express-rate-limit": "8.7.1",
+    "helmet": "8.1.0",
+    "lucide-react": "0.468.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.55.1",
+    "@types/cookie-parser": "1.4.9",
+    "@types/express": "5.0.3",
+    "@types/node": "24.5.2",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@types/supertest": "6.0.3",
+    "@vitejs/plugin-react": "4.7.0",
+    "concurrently": "9.2.5",
+    "embedded-postgres": "17.6.0-beta.15",
+    "prettier": "3.6.2",
+    "prisma": "6.19.0",
+    "supertest": "7.1.4",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2",
+    "vite": "6.4.5"
+  },
+  "overrides": {
+    "effect": "3.20.0",
+    "deepmerge-ts": "8.0.0"
+  }
+}
