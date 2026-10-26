@@ -1,3 +1,4 @@
+
 {
   "name": "clinica-integrada",
   "version": "1.0.0",
@@ -7,6 +8,7 @@
     "dev": "concurrently -k \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts",
+    "postinstall": "prisma generate",
     "db:local": "node scripts/postgres.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
