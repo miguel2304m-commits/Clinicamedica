@@ -44,13 +44,20 @@ export function Agenda({ ctx }: { ctx: Contexto }) {
   const pode = ["ADMINISTRADOR", "RECEPCIONISTA"].includes(ctx.u.perfil);
   async function editar(a?: any) {
     await ctx.acao(async () => {
-      const pacientes = await listaCompleta("/pacientes?tamanho=100");
+      // Reconsulta ao abrir: evita opções antigas ou ainda carregando após um cadastro.
+      const [pacientes, profissionais, unidades, especialidades] =
+        await Promise.all([
+          listaCompleta("/pacientes?tamanho=100"),
+          listaCompleta("/profissionais?tamanho=100"),
+          listaCompleta("/catalogos/unidades?tamanho=100"),
+          listaCompleta("/catalogos/especialidades?tamanho=100"),
+        ]);
       const admin = ctx.u.perfil === "ADMINISTRADOR";
       const referencias: Record<string, any[]> = {
         pacienteId: pacientes.itens,
-        medicoId: prof.data?.itens.filter((p: any) => p.medico) ?? [],
-        unidadeId: uni.data?.itens ?? [],
-        especialidadeId: esp.data?.itens ?? [],
+        medicoId: profissionais.itens.filter((p: any) => p.medico),
+        unidadeId: unidades.itens,
+        especialidadeId: especialidades.itens,
       };
       const escolha = (nome: string, titulo: string) => ({
         ...selecionar(nome, titulo, opcoes(referencias[nome])),

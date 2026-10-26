@@ -190,6 +190,14 @@ app.use(
       return res.status(erro.status).json({ erro: erro.message });
     if (erro instanceof Prisma.PrismaClientKnownRequestError) {
       const mensagens: Record<string, [number, string]> = {
+        P2021: [
+          503,
+          "Banco desatualizado: aplique as migrations pendentes com npm run db:migrate.",
+        ],
+        P2022: [
+          503,
+          "Banco incompatível com esta versão: aplique as migrations pendentes com npm run db:migrate.",
+        ],
         P2002: [
           409,
           "Registro duplicado: CPF, CNPJ, CRM, e-mail ou vínculo já cadastrado.",
@@ -203,10 +211,11 @@ app.use(
         P2004: [409, "A operação viola uma regra de integridade do banco."],
       };
       const [status, msg] = mensagens[erro.code] ?? [
-        422,
-        "O banco recusou a operação. Verifique os vínculos e as regras do registro.",
+        500,
+        "Falha ao consultar o banco. Consulte o código do erro nos logs do servidor.",
       ];
-      return res.status(status).json({ erro: msg });
+      console.error("Falha Prisma:", erro.code);
+      return res.status(status).json({ erro: msg, codigo: erro.code });
     }
     if (erro.type === "entity.parse.failed")
       return res.status(400).json({ erro: "JSON inválido." });

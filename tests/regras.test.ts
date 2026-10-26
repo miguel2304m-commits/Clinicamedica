@@ -4,8 +4,17 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import request from "supertest";
+import { Prisma } from "@prisma/client";
 const url = new URL(process.env.DATABASE_URL!);
+assert.ok(
+  ["localhost", "127.0.0.1"].includes(url.hostname),
+  "Testes de escrita somente no PostgreSQL local. Use node scripts/testar-local.mjs.",
+);
 url.pathname = "/clinica_test";
+const schemaTeste =
+  process.env.TEST_SCHEMA ?? "teste_" + randomUUID().replaceAll("-", "");
+assert.match(schemaTeste, /^teste_[a-z0-9_]+$/);
+url.searchParams.set("schema", schemaTeste);
 process.env.DATABASE_URL = url.toString();
 assert.equal(
   new URL(process.env.DATABASE_URL).pathname,
@@ -53,17 +62,11 @@ before(
       ["node_modules/prisma/build/index.js", "migrate", "deploy"],
       { env: process.env, stdio: "pipe" },
     );
-    const tables = await db.$queryRaw<
-      { tablename: string }[]
-    >`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
-    if (tables.length)
-      await db.$executeRawUnsafe(
-        "TRUNCATE " +
-          tables
-            .map((t) => '"' + t.tablename.replaceAll('"', '""') + '"')
-            .join(",") +
-          " RESTART IDENTITY CASCADE",
-      );
+    assert.equal(
+      await db.usuario.count(),
+      0,
+      "O schema de teste deve estar vazio; nenhum dado existente será apagado.",
+    );
     await seed();
     for (const [agent, email] of [
       [admin, "admin"],
@@ -698,26 +701,133 @@ function hoje() {
   return new Date().toISOString().slice(0, 10);
 }
 
-test('Admin salva, lista, altera e cancela agendamento com nomes livres', async () => {
-  const dados = { pacienteNome: 'Nome livre de teste', medicoNome: 'Dra. Teste Livre', unidadeNome: 'Unidade digitada', especialidadeNome: 'Especialidade digitada', inicio: '2027-08-10T10:00:00-03:00', fim: '2027-08-10T10:30:00-03:00' };
-  assert.equal((await recepcao.post('/api/agendamentos-livres').set(header).send(dados)).status, 403);
-  const r = await admin.post('/api/agendamentos-livres').set(header).send(dados);
-  assert.equal(r.status, 201, r.text);
-  assert.equal((await admin.post('/api/agendamentos-livres').set(header).send(dados)).status, 409);
-  const lista = await admin.get('/api/agendamentos?inicio=2027-08-10T00:00:00Z&fim=2027-08-11T00:00:00Z');
-  assert.ok(lista.body.some((a: any) => a.livre && a.paciente.nome === dados.pacienteNome));
-  assert.equal((await recepcao.get('/api/agendamentos?inicio=2027-08-10T00:00:00Z&fim=2027-08-11T00:00:00Z')).body.some((a: any) => a.livre), false);
-  await admin.put('/api/agendamentos-livres/' + r.body.id).set(header).send({ ...dados, pacienteNome: 'Nome corrigido' }).expect(200);
-  await admin.patch('/api/agendamentos-livres/' + r.body.id + '/situacao').set(header).send({ situacao: 'CANCELADO' }).expect(200);
+test("Agenda valida intervalo, unidade e situação sem confundir parâmetros com falha de banco", async () => {
+  const base = {
+    inicio: "2027-05-10T00:00:00-03:00",
+    fim: "2027-05-11T00:00:00-03:00",
+  };
+  for (const filtros of [{}, { unidadeId: u.id }, { situacao: "AGENDADO" }]) {
+    await admin
+      .get("/api/agendamentos")
+      .query({ ...base, ...filtros })
+      .expect(200);
+  }
+  for (const filtros of [
+    { inicio: "inválido" },
+    { fim: base.inicio },
+    { fim: "2028-05-10T00:00:00Z" },
+    { unidadeId: "abc" },
+    { situacao: "INVALIDA" },
+  ]) {
+    const r = await admin
+      .get("/api/agendamentos")
+      .query({ ...base, ...filtros });
+    assert.equal(r.status, 422);
+    assert.notEqual(r.body.codigo, "P2021");
+  }
 });
-test('Reserva livre impede sobreposição com agenda vinculada nos dois sentidos', async () => {
-  const profissional = await db.profissional.findUniqueOrThrow({ where: { id: m.profissionalId } });
+test("Tabela ausente retorna 503 com código P2021 e instrução de migration", async () => {
+  const original = db.agendamentoLivre.findMany;
+  db.agendamentoLivre.findMany = (async () => {
+    throw new Prisma.PrismaClientKnownRequestError("Tabela ausente", {
+      code: "P2021",
+      clientVersion: "6.19.0",
+    });
+  }) as typeof original;
+  try {
+    const r = await admin
+      .get("/api/agendamentos")
+      .query({ inicio: "2027-05-10T00:00:00Z", fim: "2027-05-11T00:00:00Z" });
+    assert.equal(r.status, 503);
+    assert.equal(r.body.codigo, "P2021");
+    assert.match(r.body.erro, /migrations/);
+  } finally {
+    db.agendamentoLivre.findMany = original;
+  }
+});
+
+test("Admin salva, lista, altera e cancela agendamento com nomes livres", async () => {
+  const dados = {
+    pacienteNome: "Nome livre de teste",
+    medicoNome: "Dra. Teste Livre",
+    unidadeNome: "Unidade digitada",
+    especialidadeNome: "Especialidade digitada",
+    inicio: "2027-08-10T10:00:00-03:00",
+    fim: "2027-08-10T10:30:00-03:00",
+  };
+  assert.equal(
+    (await recepcao.post("/api/agendamentos-livres").set(header).send(dados))
+      .status,
+    403,
+  );
+  const r = await admin
+    .post("/api/agendamentos-livres")
+    .set(header)
+    .send(dados);
+  assert.equal(r.status, 201, r.text);
+  assert.equal(
+    (await admin.post("/api/agendamentos-livres").set(header).send(dados))
+      .status,
+    409,
+  );
+  const lista = await admin.get(
+    "/api/agendamentos?inicio=2027-08-10T00:00:00Z&fim=2027-08-11T00:00:00Z",
+  );
+  assert.ok(
+    lista.body.some(
+      (a: any) => a.livre && a.paciente.nome === dados.pacienteNome,
+    ),
+  );
+  assert.equal(
+    (
+      await recepcao.get(
+        "/api/agendamentos?inicio=2027-08-10T00:00:00Z&fim=2027-08-11T00:00:00Z",
+      )
+    ).body.some((a: any) => a.livre),
+    false,
+  );
+  await admin
+    .put("/api/agendamentos-livres/" + r.body.id)
+    .set(header)
+    .send({ ...dados, pacienteNome: "Nome corrigido" })
+    .expect(200);
+  await admin
+    .patch("/api/agendamentos-livres/" + r.body.id + "/situacao")
+    .set(header)
+    .send({ situacao: "CANCELADO" })
+    .expect(200);
+});
+test("Reserva livre impede sobreposição com agenda vinculada nos dois sentidos", async () => {
+  const profissional = await db.profissional.findUniqueOrThrow({
+    where: { id: m.profissionalId },
+  });
   const normal = { ...criarAgenda(1500), pacienteConvenioId: null };
-  const livre = { pacienteNome: 'Paciente sem cadastro', medicoNome: profissional.nome, unidadeNome: 'Unidade livre', especialidadeNome: 'Clínica Geral', inicio: normal.inicio, fim: normal.fim };
-  const reserva = await admin.post('/api/agendamentos-livres').set(header).send(livre);
+  const livre = {
+    pacienteNome: "Paciente sem cadastro",
+    medicoNome: profissional.nome,
+    unidadeNome: "Unidade livre",
+    especialidadeNome: "Clínica Geral",
+    inicio: normal.inicio,
+    fim: normal.fim,
+  };
+  const reserva = await admin
+    .post("/api/agendamentos-livres")
+    .set(header)
+    .send(livre);
   assert.equal(reserva.status, 201, reserva.text);
-  assert.equal((await recepcao.post('/api/agendamentos').set(header).send(normal)).status, 409);
-  await admin.patch(`/api/agendamentos-livres/${reserva.body.id}/situacao`).set(header).send({ situacao: 'CANCELADO' }).expect(200);
-  await recepcao.post('/api/agendamentos').set(header).send(normal).expect(201);
-  assert.equal((await admin.post('/api/agendamentos-livres').set(header).send(livre)).status, 409);
+  assert.equal(
+    (await recepcao.post("/api/agendamentos").set(header).send(normal)).status,
+    409,
+  );
+  await admin
+    .patch(`/api/agendamentos-livres/${reserva.body.id}/situacao`)
+    .set(header)
+    .send({ situacao: "CANCELADO" })
+    .expect(200);
+  await recepcao.post("/api/agendamentos").set(header).send(normal).expect(201);
+  assert.equal(
+    (await admin.post("/api/agendamentos-livres").set(header).send(livre))
+      .status,
+    409,
+  );
 });

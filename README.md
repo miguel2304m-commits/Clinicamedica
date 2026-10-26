@@ -68,7 +68,9 @@ npm.cmd run docs
 npm.cmd audit
 ```
 
-Os testes recriam **apenas** as tabelas do banco separado `clinica_test`, aplicam migrations e carregam fixtures próprias. Nunca use esse banco para dados que deseja conservar. O banco `clinica` da demonstração não é limpo pelos testes.
+Os testes usam exclusivamente o PostgreSQL local, no banco `clinica_test`, criando um schema novo a cada execução. Aplicam migrations e fixtures nesse schema vazio, sem limpar dados existentes. A URL da Neon é ignorada pelo executor de testes.
+
+Correção de produção e validações mais recentes: [Agenda na Neon/Vercel](docs/correcao-agenda-neon.md).
 
 Para repetir os testes de navegador, rode `npm.cmd test` antes, inicie `node scripts/servidor-teste.mjs` em outro terminal e execute `node scripts/verificar-interface.mjs`. O roteiro usa Microsoft Edge instalado no Windows e grava capturas em `docs/evidencias/`.
 

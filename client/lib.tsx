@@ -107,28 +107,31 @@ export async function api(url: string, method = "GET", body?: unknown) {
   return data;
 }
 export function useApi(url: string, versao = 0) {
-  const [data, setData] = useState<any>(null),
-    [erro, setErro] = useState(""),
-    [carregando, setCarregando] = useState(true);
+  const chave = JSON.stringify([url, versao]);
+  const [estado, setEstado] = useState<{
+    chave: string;
+    data: any;
+    erro: string;
+    carregando: boolean;
+  }>({ chave: "", data: null, erro: "", carregando: true });
   useEffect(() => {
     let ativo = true;
-    setCarregando(true);
-    setErro("");
+    setEstado({ chave, data: null, erro: "", carregando: true });
     (url.includes("tamanho=100") ? listaCompleta(url) : api(url))
       .then((d) => {
-        if (ativo) setData(d);
+        if (ativo) setEstado({ chave, data: d, erro: "", carregando: false });
       })
       .catch((e) => {
-        if (ativo) setErro(e.message);
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false);
+        if (ativo)
+          setEstado({ chave, data: null, erro: e.message, carregando: false });
       });
     return () => {
       ativo = false;
     };
   }, [url, versao]);
-  return { data, erro, carregando };
+  return estado.chave === chave
+    ? estado
+    : { data: null, erro: "", carregando: true };
 }
 export function Estado({
   erro,

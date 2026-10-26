@@ -15,6 +15,7 @@ import {
   nomes,
   dia,
   moeda,
+  listaCompleta,
   type Campo,
 } from "./lib";
 const tipos: Record<
@@ -114,105 +115,109 @@ export function Cadastros({ ctx }: { ctx: Contexto }) {
     `${prof ? "/profissionais" : "/catalogos/" + tipo}?busca=${encodeURIComponent(busca)}&pagina=${pagina}`,
     ctx.versao,
   );
-  const especiais = useApi("/catalogos/especialidades?tamanho=100", ctx.versao),
-    unidades = useApi("/catalogos/unidades?tamanho=100", ctx.versao);
   const pode =
     ctx.u.perfil === "ADMINISTRADOR" ||
     (tipo === "convenios" && ctx.u.perfil === "RECEPCIONISTA");
   function editar(row?: any) {
-    if (prof) {
-      ctx.abrir({
-        titulo: row ? "Editar profissional" : "Cadastrar profissional",
-        campos: [
-          ...pessoaCampos,
-          campo("registro", "Registro profissional"),
-          {
-            ...selecionar(
-              "unidades",
-              "Unidades de atuação",
-              opcoes(unidades.data?.itens),
-            ),
-            type: "multiselect",
-            help: "Use Ctrl ou ⌘ para selecionar mais de uma.",
-          },
-          campo("crm", "CRM (somente médicos)", "text", false),
-          selecionar(
-            "ufCrm",
-            "UF do CRM",
-            "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO"
-              .split(" ")
-              .map((value) => ({ value, label: value })),
-            false,
-          ),
-          {
-            ...selecionar(
-              "especialidades",
-              "Especialidades médicas",
-              opcoes(especiais.data?.itens),
+    void ctx.acao(async () => {
+      const [especialidadesAtuais, unidadesAtuais] = await Promise.all([
+        listaCompleta("/catalogos/especialidades?tamanho=100"),
+        listaCompleta("/catalogos/unidades?tamanho=100"),
+      ]);
+      if (prof) {
+        ctx.abrir({
+          titulo: row ? "Editar profissional" : "Cadastrar profissional",
+          campos: [
+            ...pessoaCampos,
+            campo("registro", "Registro profissional"),
+            {
+              ...selecionar(
+                "unidades",
+                "Unidades de atuação",
+                opcoes(unidadesAtuais.itens),
+              ),
+              type: "multiselect",
+              help: "Use Ctrl ou ⌘ para selecionar mais de uma.",
+            },
+            campo("crm", "CRM (somente médicos)", "text", false),
+            selecionar(
+              "ufCrm",
+              "UF do CRM",
+              "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO"
+                .split(" ")
+                .map((value) => ({ value, label: value })),
               false,
             ),
-            type: "multiselect",
+            {
+              ...selecionar(
+                "especialidades",
+                "Especialidades médicas",
+                opcoes(especialidadesAtuais.itens),
+                false,
+              ),
+              type: "multiselect",
+            },
+          ],
+          inicial: row
+            ? {
+                ...row,
+                nascimento: row.nascimento.slice(0, 10),
+                unidades: row.unidades.map((u: any) => String(u.unidadeId)),
+                crm: row.medico?.crm,
+                ufCrm: row.medico?.ufCrm,
+                especialidades: row.medico?.especialidades.map((e: any) =>
+                  String(e.especialidadeId),
+                ),
+              }
+            : undefined,
+          submit: (v) => {
+            const { crm, ufCrm, especialidades, ...dados } = v;
+            return api(
+              "/profissionais" + (row ? "/" + row.id : ""),
+              row ? "PUT" : "POST",
+              {
+                ...dados,
+                ...(crm ? { medico: { crm, ufCrm, especialidades } } : {}),
+              },
+            );
           },
+        });
+        return;
+      }
+      ctx.abrir({
+        titulo: (row ? "Editar " : "Cadastrar ") + config.titulo.toLowerCase(),
+        campos: [
+          ...config.campos,
+          ...(tipo === "unidades"
+            ? [
+                {
+                  ...selecionar(
+                    "especialidades",
+                    "Especialidades disponíveis",
+                    opcoes(especialidadesAtuais.itens),
+                  ),
+                  type: "multiselect",
+                  help: "Use Ctrl ou ⌘ para selecionar mais de uma.",
+                },
+              ]
+            : []),
         ],
         inicial: row
           ? {
               ...row,
-              nascimento: row.nascimento.slice(0, 10),
-              unidades: row.unidades.map((u: any) => String(u.unidadeId)),
-              crm: row.medico?.crm,
-              ufCrm: row.medico?.ufCrm,
-              especialidades: row.medico?.especialidades.map((e: any) =>
+              especialidades: row.especialidades?.map((e: any) =>
                 String(e.especialidadeId),
               ),
             }
           : undefined,
-        submit: (v) => {
-          const { crm, ufCrm, especialidades, ...dados } = v;
-          return api(
-            "/profissionais" + (row ? "/" + row.id : ""),
+        submit: (v) =>
+          api(
+            "/catalogos/" + tipo + (row ? "/" + row.id : ""),
             row ? "PUT" : "POST",
-            {
-              ...dados,
-              ...(crm ? { medico: { crm, ufCrm, especialidades } } : {}),
-            },
-          );
-        },
+            v,
+          ),
       });
-      return;
-    }
-    ctx.abrir({
-      titulo: (row ? "Editar " : "Cadastrar ") + config.titulo.toLowerCase(),
-      campos: [
-        ...config.campos,
-        ...(tipo === "unidades"
-          ? [
-              {
-                ...selecionar(
-                  "especialidades",
-                  "Especialidades disponíveis",
-                  opcoes(especiais.data?.itens),
-                ),
-                type: "multiselect",
-                help: "Use Ctrl ou ⌘ para selecionar mais de uma.",
-              },
-            ]
-          : []),
-      ],
-      inicial: row
-        ? {
-            ...row,
-            especialidades: row.especialidades?.map((e: any) =>
-              String(e.especialidadeId),
-            ),
-          }
-        : undefined,
-      submit: (v) =>
-        api(
-          "/catalogos/" + tipo + (row ? "/" + row.id : ""),
-          row ? "PUT" : "POST",
-          v,
-        ),
-    });
+    }, "");
   }
   return (
     <>
