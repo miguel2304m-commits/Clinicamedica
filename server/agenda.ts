@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, transacao, exigir, type Tx } from "./db";
-import { permitir, auditar } from "./auth";
-import { agenda, consulta, id, data } from "./validacao";
+import { db, transacao, exigir, type Tx } from "./db.js";
+import { permitir, auditar } from "./auth.js";
+import { agenda, consulta, id, data } from "./validacao.js";
 export const agendaRouter = Router();
 const recepcao = permitir("ADMINISTRADOR", "RECEPCIONISTA");
 export async function validarAgenda(
@@ -12,7 +12,7 @@ export async function validarAgenda(
 ) {
   exigir(
     input.fim > input.inicio && +input.fim - +input.inicio <= 4 * 3600000,
-    "A duração deve ser positiva e de até 4 horas.",
+    "A duraÃ§Ã£o deve ser positiva e de atÃ© 4 horas.",
   );
   const [unidade, especialidade, oferta] = await Promise.all([
     tx.profissionalUnidade.findUnique({
@@ -42,7 +42,7 @@ export async function validarAgenda(
   ]);
   exigir(
     unidade && especialidade && oferta,
-    "O médico, a unidade e a especialidade não possuem os vínculos necessários.",
+    "O mÃ©dico, a unidade e a especialidade nÃ£o possuem os vÃ­nculos necessÃ¡rios.",
   );
   const conflito = await tx.agendamento.findFirst({
     where: {
@@ -55,7 +55,7 @@ export async function validarAgenda(
   });
   exigir(
     !conflito,
-    "O médico já possui atendimento neste intervalo, inclusive em outra unidade.",
+    "O mÃ©dico jÃ¡ possui atendimento neste intervalo, inclusive em outra unidade.",
     409,
   );
   let convenioHistorico: string | null = null;
@@ -69,9 +69,9 @@ export async function validarAgenda(
         v.pacienteId === input.pacienteId &&
         v.ativo &&
         v.adesao <= input.inicio,
-      "Convênio inválido, inativo ou não pertencente ao paciente.",
+      "ConvÃªnio invÃ¡lido, inativo ou nÃ£o pertencente ao paciente.",
     );
-    convenioHistorico = `${v.convenio.nome} • ${v.carteirinha}`;
+    convenioHistorico = `${v.convenio.nome} â€¢ ${v.carteirinha}`;
   }
   return convenioHistorico;
 }
@@ -105,7 +105,7 @@ agendaRouter.get(
       .parse(req.query);
     exigir(
       q.fim > q.inicio && +q.fim - +q.inicio <= 93 * 86400000,
-      "Selecione um período de até 93 dias.",
+      "Selecione um perÃ­odo de atÃ© 93 dias.",
     );
     const u = req.usuario;
     const where: any = {
@@ -181,20 +181,20 @@ agendaRouter.patch("/agendamentos/:id/situacao", recepcao, async (req, res) => {
   res.json(
     await transacao(async (tx) => {
       const a = await tx.agendamento.findUnique({ where: { id: codigo } });
-      exigir(a, "Agendamento não encontrado.", 404);
+      exigir(a, "Agendamento nÃ£o encontrado.", 404);
       const permitidas: Record<string, string[]> = {
         AGENDADO: ["CONFIRMADO", "CANCELADO", "NAO_COMPARECEU"],
         CONFIRMADO: ["CANCELADO", "NAO_COMPARECEU"],
       };
       exigir(
         permitidas[a.situacao]?.includes(situacao),
-        "Transição de situação não permitida.",
+        "TransiÃ§Ã£o de situaÃ§Ã£o nÃ£o permitida.",
         409,
       );
       if (situacao === "NAO_COMPARECEU")
         exigir(
           a.fim <= new Date(),
-          "Registre a ausência somente após o término previsto.",
+          "Registre a ausÃªncia somente apÃ³s o tÃ©rmino previsto.",
         );
       const r = await tx.agendamento.update({
         where: { id: codigo },
@@ -212,20 +212,20 @@ agendaRouter.post("/consultas", permitir("MEDICO"), async (req, res) => {
       const a = await tx.agendamento.findUnique({
         where: { id: input.agendamentoId },
       });
-      exigir(a, "Agendamento não encontrado.", 404);
+      exigir(a, "Agendamento nÃ£o encontrado.", 404);
       exigir(
         a.medicoId === req.usuario.profissionalId,
-        "Atendimento pertence a outro médico.",
+        "Atendimento pertence a outro mÃ©dico.",
         403,
       );
       exigir(
         ["AGENDADO", "CONFIRMADO"].includes(a.situacao),
-        "Este agendamento não pode gerar uma consulta.",
+        "Este agendamento nÃ£o pode gerar uma consulta.",
         409,
       );
       exigir(
         a.inicio <= new Date(),
-        "O atendimento não pode ser realizado antes do início previsto.",
+        "O atendimento nÃ£o pode ser realizado antes do inÃ­cio previsto.",
       );
       const c = await tx.consulta.create({
         data: {

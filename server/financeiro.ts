@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { db, transacao, exigir, type Tx } from "./db";
-import { permitir, auditar } from "./auth";
-import { id, texto, dinheiro, data, paginar } from "./validacao";
+import { db, transacao, exigir, type Tx } from "./db.js";
+import { permitir, auditar } from "./auth.js";
+import { id, texto, dinheiro, data, paginar } from "./validacao.js";
 export const financeiro = Router();
 const acesso = permitir("ADMINISTRADOR", "FINANCEIRO");
 const D = (n: Prisma.Decimal.Value) => new Prisma.Decimal(n);
@@ -125,7 +125,7 @@ financeiro.post("/cobrancas", acesso, async (req, res) => {
               input.vencimento.toISOString().slice(0, 10) &&
             totalExistente.eq(input.valorTotal) &&
             coberturaExistente.eq(input.valorCoberto),
-          "Chave de operação já utilizada com dados diferentes.",
+          "Chave de operaÃ§Ã£o jÃ¡ utilizada com dados diferentes.",
           409,
         );
         return existentes;
@@ -134,7 +134,7 @@ financeiro.post("/cobrancas", acesso, async (req, res) => {
         where: { id: input.consultaId },
         include: { agendamento: true },
       });
-      exigir(c, "Consulta não encontrada.", 404);
+      exigir(c, "Consulta nÃ£o encontrada.", 404);
       const total = D(input.valorTotal),
         coberto = D(input.valorCoberto);
       exigir(
@@ -143,7 +143,7 @@ financeiro.post("/cobrancas", acesso, async (req, res) => {
       );
       exigir(
         coberto.eq(0) || c.agendamento.pacienteConvenioId,
-        "Este atendimento não possui convênio vinculado.",
+        "Este atendimento nÃ£o possui convÃªnio vinculado.",
       );
       if (input.procedimentoRealizadoId) {
         const p = await tx.procedimentoRealizado.findUnique({
@@ -151,11 +151,11 @@ financeiro.post("/cobrancas", acesso, async (req, res) => {
         });
         exigir(
           p?.consultaId === c.id,
-          "Procedimento não pertence a esta consulta.",
+          "Procedimento nÃ£o pertence a esta consulta.",
         );
         exigir(
           p.valorCobrado.eq(total),
-          "O total deve corresponder ao valor registrado na realização.",
+          "O total deve corresponder ao valor registrado na realizaÃ§Ã£o.",
         );
         exigir(
           !(await tx.cobranca.count({
@@ -164,7 +164,7 @@ financeiro.post("/cobrancas", acesso, async (req, res) => {
               situacao: { not: "CANCELADA" },
             },
           })),
-          "Procedimento já faturado.",
+          "Procedimento jÃ¡ faturado.",
           409,
         );
       }
@@ -222,21 +222,21 @@ financeiro.post("/cobrancas/:id/pagamentos", acesso, async (req, res) => {
           existente.cobrancaId === cobrancaId &&
             existente.valor.eq(input.valor) &&
             existente.forma === input.forma,
-          "Chave de pagamento já utilizada.",
+          "Chave de pagamento jÃ¡ utilizada.",
           409,
         );
         return existente;
       }
       const { c, aberto } = await saldo(tx, cobrancaId);
-      exigir(c.situacao !== "CANCELADA", "Cobrança cancelada.", 409);
+      exigir(c.situacao !== "CANCELADA", "CobranÃ§a cancelada.", 409);
       const valor = D(input.valor);
       exigir(
         valor.gt(0) && valor.lte(aberto),
-        "O pagamento deve ser positivo e não ultrapassar o saldo.",
+        "O pagamento deve ser positivo e nÃ£o ultrapassar o saldo.",
       );
       exigir(
         (c.responsavel === "CONVENIO") === (input.forma === "CONVENIO"),
-        "Use a forma Convênio somente para repasses do convênio.",
+        "Use a forma ConvÃªnio somente para repasses do convÃªnio.",
       );
       const p = await tx.pagamento.create({ data: { cobrancaId, ...input } });
       await tx.cobranca.update({
@@ -255,7 +255,7 @@ financeiro.post("/pagamentos/:id/estorno", acesso, async (req, res) => {
       const p = await tx.pagamento.findUnique({ where: { id: codigo } });
       exigir(
         p && p.situacao === "RECEBIDO",
-        "Pagamento já estornado ou inexistente.",
+        "Pagamento jÃ¡ estornado ou inexistente.",
         409,
       );
       const r = await tx.pagamento.update({
@@ -279,7 +279,7 @@ financeiro.post("/cobrancas/:id/cancelamento", acesso, async (req, res) => {
       const { c, recebido } = await saldo(tx, codigo);
       exigir(
         c.situacao !== "CANCELADA" && recebido.eq(0),
-        "Estorne os pagamentos antes de cancelar a cobrança.",
+        "Estorne os pagamentos antes de cancelar a cobranÃ§a.",
         409,
       );
       const r = await tx.cobranca.update({
@@ -303,7 +303,7 @@ financeiro.get("/relatorios", acesso, async (req, res) => {
     .parse(req.query);
   exigir(
     q.fim > q.inicio && +q.fim - +q.inicio <= 366 * 86400000,
-    "Selecione um intervalo de até 366 dias.",
+    "Selecione um intervalo de atÃ© 366 dias.",
   );
   const filtro = {
     unidadeId: q.unidadeId,
@@ -381,13 +381,13 @@ financeiro.get("/relatorios", acesso, async (req, res) => {
       for (const [tipo, nome] of [
         [
           "medicos",
-          `#${c.consulta.medicoId} · ${c.consulta.medico.profissional.nome}`,
+          `#${c.consulta.medicoId} Â· ${c.consulta.medico.profissional.nome}`,
         ],
         [
           "especialidades",
-          `#${c.consulta.especialidadeId} · ${c.consulta.especialidade.nome}`,
+          `#${c.consulta.especialidadeId} Â· ${c.consulta.especialidade.nome}`,
         ],
-        ["unidades", `#${c.consulta.unidadeId} · ${c.consulta.unidade.nome}`],
+        ["unidades", `#${c.consulta.unidadeId} Â· ${c.consulta.unidade.nome}`],
       ])
         grupos[tipo][nome] = (grupos[tipo][nome] ?? D(0)).plus(c.valor);
       if (saldo.gt(0)) {

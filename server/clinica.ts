@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, transacao, exigir } from "./db";
-import { permitir, auditar, escopoPaciente, consultaPropria } from "./auth";
-import { id, texto, longo, dinheiro, data } from "./validacao";
+import { db, transacao, exigir } from "./db.js";
+import { permitir, auditar, escopoPaciente, consultaPropria } from "./auth.js";
+import { id, texto, longo, dinheiro, data } from "./validacao.js";
 export const clinica = Router();
 const medico = permitir("MEDICO");
 clinica.get(
@@ -177,7 +177,7 @@ clinica.patch(
         const e = await tx.solicitacaoExame.findUnique({
           where: { id: codigo },
         });
-        exigir(e, "Solicitação não encontrada.", 404);
+        exigir(e, "SolicitaÃ§Ã£o nÃ£o encontrada.", 404);
         if (req.usuario.perfil === "MEDICO")
           await consultaPropria(req.usuario, e.consultaId, tx);
         else {
@@ -196,7 +196,7 @@ clinica.patch(
         };
         exigir(
           transicoes[e.situacao]?.includes(input.situacao),
-          "Transição de exame não permitida.",
+          "TransiÃ§Ã£o de exame nÃ£o permitida.",
           409,
         );
         if (input.situacao === "REALIZADO")
@@ -205,12 +205,12 @@ clinica.patch(
               input.realizadoEm &&
               input.realizadoEm >= e.solicitadoEm &&
               input.realizadoEm <= new Date(),
-            "Informe resultado e data válida de realização.",
+            "Informe resultado e data vÃ¡lida de realizaÃ§Ã£o.",
           );
         else
           exigir(
             !input.resultado && !input.realizadoEm,
-            "Resultado e realização só são aceitos em exames realizados.",
+            "Resultado e realizaÃ§Ã£o sÃ³ sÃ£o aceitos em exames realizados.",
           );
         const r = await tx.solicitacaoExame.update({
           where: { id: codigo },
@@ -278,7 +278,7 @@ clinica.post("/consultas/:id/procedimentos", medico, async (req, res) => {
       const c = await consultaPropria(req.usuario, consultaId, tx);
       exigir(
         input.data >= c.data && input.data <= new Date(),
-        "A realização deve ocorrer entre a consulta e o momento atual.",
+        "A realizaÃ§Ã£o deve ocorrer entre a consulta e o momento atual.",
       );
       exigir(
         await tx.profissionalUnidade.findUnique({
@@ -289,7 +289,7 @@ clinica.post("/consultas/:id/procedimentos", medico, async (req, res) => {
             },
           },
         }),
-        "Profissional responsável não atua nesta unidade.",
+        "Profissional responsÃ¡vel nÃ£o atua nesta unidade.",
       );
       const r = await tx.procedimentoRealizado.create({
         data: { consultaId, ...input },

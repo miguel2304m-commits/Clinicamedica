@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { Perfil } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
-import { db, Erro, exigir, type Tx } from "./db";
+import { db, Erro, exigir, type Tx } from "./db.js";
 export type Identidade = {
   id: number;
   nome: string;
@@ -39,7 +39,7 @@ export async function autenticar(
   });
   exigir(
     sessao && sessao.expiraEm > new Date() && sessao.usuario.ativo,
-    "Sua sessão expirou. Entre novamente.",
+    "Sua sessÃ£o expirou. Entre novamente.",
     401,
   );
   const { id, nome, email, perfil, profissionalId } = sessao.usuario;
@@ -51,7 +51,7 @@ export const permitir =
   (req: Request, _res: Response, next: NextFunction) => {
     exigir(
       perfis.includes(req.usuario.perfil),
-      "Seu perfil não tem permissão para esta ação.",
+      "Seu perfil nÃ£o tem permissÃ£o para esta aÃ§Ã£o.",
       403,
     );
     next();
@@ -72,7 +72,7 @@ export async function escopoPaciente(
   pacienteId: number,
   tx: Tx = db,
 ) {
-  exigir(u.profissionalId, "Conta clínica sem profissional vinculado.", 403);
+  exigir(u.profissionalId, "Conta clÃ­nica sem profissional vinculado.", 403);
   if (u.perfil === "MEDICO") {
     const n = await tx.agendamento.count({
       where: {
@@ -92,8 +92,8 @@ export async function escopoPaciente(
         },
       },
     });
-    exigir(n > 0, "Paciente fora das unidades em que você atua.", 403);
-  } else throw new Erro(403, "Informação restrita à equipe clínica.");
+    exigir(n > 0, "Paciente fora das unidades em que vocÃª atua.", 403);
+  } else throw new Erro(403, "InformaÃ§Ã£o restrita Ã  equipe clÃ­nica.");
 }
 export async function consultaPropria(
   u: Identidade,
@@ -101,10 +101,10 @@ export async function consultaPropria(
   tx: Tx = db,
 ) {
   const c = await tx.consulta.findUnique({ where: { id: consultaId } });
-  exigir(c, "Consulta não encontrada.", 404);
+  exigir(c, "Consulta nÃ£o encontrada.", 404);
   exigir(
     u.perfil === "MEDICO" && c.medicoId === u.profissionalId,
-    "Somente o médico responsável pode registrar nesta consulta.",
+    "Somente o mÃ©dico responsÃ¡vel pode registrar nesta consulta.",
     403,
   );
   return c;

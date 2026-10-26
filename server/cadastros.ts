@@ -1,7 +1,7 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { z } from "zod";
-import { db, transacao, exigir } from "./db";
-import { permitir, auditar, escopoPaciente, publico } from "./auth";
+import { db, transacao, exigir } from "./db.js";
+import { permitir, auditar, escopoPaciente, publico } from "./auth.js";
 import {
   pessoa,
   profissional,
@@ -12,7 +12,7 @@ import {
   id,
   data,
   dinheiro,
-} from "./validacao";
+} from "./validacao.js";
 import bcrypt from "bcryptjs";
 export const cadastros = Router();
 const admin = permitir("ADMINISTRADOR");
