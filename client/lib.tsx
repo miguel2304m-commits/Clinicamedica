@@ -358,8 +358,9 @@ export function Modal({
                 />
               ) : (
                 <input
+                  list={c.type === "livre" ? "opcoes-" + c.name : undefined}
                   name={c.name}
-                  type={c.type ?? "text"}
+                  type={c.type === "livre" ? "text" : (c.type ?? "text")}
                   step={
                     c.type === "number"
                       ? "0.01"
@@ -383,6 +384,13 @@ export function Modal({
                   min={c.type === "number" ? "0" : undefined}
                 />
               )}{" "}
+              {c.type === "livre" && (
+                <datalist id={"opcoes-" + c.name}>
+                  {c.options?.map((o) => (
+                    <option key={o.value} value={o.label} />
+                  ))}
+                </datalist>
+              )}
               {c.help && <small>{c.help}</small>}
             </label>
           ))}

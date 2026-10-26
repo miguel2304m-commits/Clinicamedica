@@ -3,7 +3,9 @@ import { z } from "zod";
 import { db, transacao, exigir, type Tx } from "./db.js";
 import { permitir, auditar } from "./auth.js";
 import { agenda, consulta, id, data } from "./validacao.js";
+import { agendaLivre, chaveNome } from './agenda-livre.js';
 export const agendaRouter = Router();
+agendaRouter.use(agendaLivre);
 const recepcao = permitir("ADMINISTRADOR", "RECEPCIONISTA");
 export async function validarAgenda(
   tx: Tx,
@@ -59,6 +61,9 @@ export async function validarAgenda(
     409,
   );
   let convenioHistorico: string | null = null;
+  const profissional = await tx.profissional.findUniqueOrThrow({ where: { id: input.medicoId } });
+  const reservaLivre = await tx.agendamentoLivre.findFirst({ where: { medicoChave: chaveNome(profissional.nome), situacao: { in: ['AGENDADO', 'CONFIRMADO'] }, inicio: { lt: input.fim }, fim: { gt: input.inicio } } });
+  exigir(!reservaLivre, 'Existe um pré-agendamento para esse médico neste intervalo.', 409);
   if (input.pacienteConvenioId) {
     const v = await tx.pacienteConvenio.findUnique({
       where: { id: input.pacienteConvenioId },
@@ -124,8 +129,10 @@ agendaRouter.get(
       include,
       orderBy: { inicio: "asc" },
     });
+    const livres = u.perfil === 'ADMINISTRADOR' ? await db.agendamentoLivre.findMany({ where: { inicio: { gte: q.inicio, lt: q.fim }, situacao: q.situacao, ...(q.unidadeId ? { unidadeNome: { equals: (await db.unidade.findUnique({ where: { id: q.unidadeId } }))?.nome ?? '', mode: 'insensitive' as const } } : {}), ...(q.medicoId ? { medicoChave: chaveNome((await db.profissional.findUnique({ where: { id: q.medicoId } }))?.nome ?? '') } : {}) } }) : [];
+    const reservas = livres.map(a => ({ ...a, livre: true, paciente: { nome: a.pacienteNome }, medico: { profissional: { nome: a.medicoNome } }, unidade: { nome: a.unidadeNome }, especialidade: { nome: a.especialidadeNome }, consulta: null }));
     res.json(
-      rows.map((a) =>
+      [...rows.map((a) =>
         u.perfil === "ENFERMAGEM"
           ? {
               ...a,
@@ -134,7 +141,7 @@ agendaRouter.get(
               pacienteConvenioId: undefined,
             }
           : a,
-      ),
+      ), ...reservas].sort((a, b) => +a.inicio - +b.inicio),
     );
   },
 );

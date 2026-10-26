@@ -697,3 +697,27 @@ test("RN18: alteração de perfil revoga sessão e impede auto-rebaixamento", as
 function hoje() {
   return new Date().toISOString().slice(0, 10);
 }
+
+test('Admin salva, lista, altera e cancela agendamento com nomes livres', async () => {
+  const dados = { pacienteNome: 'Nome livre de teste', medicoNome: 'Dra. Teste Livre', unidadeNome: 'Unidade digitada', especialidadeNome: 'Especialidade digitada', inicio: '2027-08-10T10:00:00-03:00', fim: '2027-08-10T10:30:00-03:00' };
+  assert.equal((await recepcao.post('/api/agendamentos-livres').set(header).send(dados)).status, 403);
+  const r = await admin.post('/api/agendamentos-livres').set(header).send(dados);
+  assert.equal(r.status, 201, r.text);
+  assert.equal((await admin.post('/api/agendamentos-livres').set(header).send(dados)).status, 409);
+  const lista = await admin.get('/api/agendamentos?inicio=2027-08-10T00:00:00Z&fim=2027-08-11T00:00:00Z');
+  assert.ok(lista.body.some((a: any) => a.livre && a.paciente.nome === dados.pacienteNome));
+  assert.equal((await recepcao.get('/api/agendamentos?inicio=2027-08-10T00:00:00Z&fim=2027-08-11T00:00:00Z')).body.some((a: any) => a.livre), false);
+  await admin.put('/api/agendamentos-livres/' + r.body.id).set(header).send({ ...dados, pacienteNome: 'Nome corrigido' }).expect(200);
+  await admin.patch('/api/agendamentos-livres/' + r.body.id + '/situacao').set(header).send({ situacao: 'CANCELADO' }).expect(200);
+});
+test('Reserva livre impede sobreposição com agenda vinculada nos dois sentidos', async () => {
+  const profissional = await db.profissional.findUniqueOrThrow({ where: { id: m.profissionalId } });
+  const normal = { ...criarAgenda(1500), pacienteConvenioId: null };
+  const livre = { pacienteNome: 'Paciente sem cadastro', medicoNome: profissional.nome, unidadeNome: 'Unidade livre', especialidadeNome: 'Clínica Geral', inicio: normal.inicio, fim: normal.fim };
+  const reserva = await admin.post('/api/agendamentos-livres').set(header).send(livre);
+  assert.equal(reserva.status, 201, reserva.text);
+  assert.equal((await recepcao.post('/api/agendamentos').set(header).send(normal)).status, 409);
+  await admin.patch(`/api/agendamentos-livres/${reserva.body.id}/situacao`).set(header).send({ situacao: 'CANCELADO' }).expect(200);
+  await recepcao.post('/api/agendamentos').set(header).send(normal).expect(201);
+  assert.equal((await admin.post('/api/agendamentos-livres').set(header).send(livre)).status, 409);
+});

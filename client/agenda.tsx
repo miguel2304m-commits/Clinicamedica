@@ -45,21 +45,29 @@ export function Agenda({ ctx }: { ctx: Contexto }) {
   async function editar(a?: any) {
     await ctx.acao(async () => {
       const pacientes = await listaCompleta("/pacientes?tamanho=100");
+      const admin = ctx.u.perfil === "ADMINISTRADOR";
+      const referencias: Record<string, any[]> = {
+        pacienteId: pacientes.itens,
+        medicoId: prof.data?.itens.filter((p: any) => p.medico) ?? [],
+        unidadeId: uni.data?.itens ?? [],
+        especialidadeId: esp.data?.itens ?? [],
+      };
+      const escolha = (nome: string, titulo: string) => ({
+        ...selecionar(nome, titulo, opcoes(referencias[nome])),
+        ...(admin
+          ? {
+              type: "livre",
+              help: "Escolha uma sugestão ou digite livremente.",
+            }
+          : {}),
+      });
       ctx.abrir({
         titulo: a ? "Reagendar atendimento" : "Novo agendamento",
         campos: [
-          selecionar("pacienteId", "Paciente", opcoes(pacientes.itens)),
-          selecionar(
-            "medicoId",
-            "Médico",
-            opcoes(prof.data?.itens.filter((p: any) => p.medico)),
-          ),
-          selecionar("unidadeId", "Unidade", opcoes(uni.data?.itens)),
-          selecionar(
-            "especialidadeId",
-            "Especialidade",
-            opcoes(esp.data?.itens),
-          ),
+          escolha("pacienteId", "Paciente"),
+          escolha("medicoId", "Médico"),
+          escolha("unidadeId", "Unidade"),
+          escolha("especialidadeId", "Especialidade"),
           campo("inicio", "Início (horário de Brasília)", "datetime-local"),
           campo("fim", "Término (horário de Brasília)", "datetime-local"),
           {
@@ -79,19 +87,69 @@ export function Agenda({ ctx }: { ctx: Contexto }) {
           ),
         ],
         inicial: a
-          ? { ...a, inicio: localData(a.inicio), fim: localData(a.fim) }
+          ? {
+              ...a,
+              ...(admin
+                ? {
+                    pacienteId: a.paciente.nome,
+                    medicoId: a.medico.profissional.nome,
+                    unidadeId: a.unidade.nome,
+                    especialidadeId: a.especialidade.nome,
+                  }
+                : {}),
+              inicio: localData(a.inicio),
+              fim: localData(a.fim),
+            }
           : { inicio: data + "T09:00", fim: data + "T09:30" },
-        submit: (v) =>
-          api("/agendamentos" + (a ? "/" + a.id : ""), a ? "PUT" : "POST", {
-            ...v,
-            pacienteId: Number(v.pacienteId),
-            medicoId: Number(v.medicoId),
-            unidadeId: Number(v.unidadeId),
-            especialidadeId: Number(v.especialidadeId),
-            pacienteConvenioId: v.pacienteConvenioId || null,
-            inicio: instante(v.inicio),
-            fim: instante(v.fim),
-          }),
+        submit: (v) => {
+          const ids: Record<string, number | undefined> = {};
+          for (const [chave, registros] of Object.entries(referencias)) {
+            const encontrados = registros.filter(
+              (r) =>
+                r.nome.trim().toLowerCase() ===
+                String(v[chave]).trim().toLowerCase(),
+            );
+            if (admin && encontrados.length > 1)
+              throw new Error(
+                "Há cadastros com nomes iguais. Diferencie os nomes no cadastro antes de agendar.",
+              );
+            ids[chave] = admin ? encontrados[0]?.id : Number(v[chave]);
+          }
+          if (admin && (a?.livre || Object.values(ids).some((id) => !id))) {
+            if (a && !a.livre)
+              throw new Error(
+                "Para alterar um atendimento vinculado, use nomes já cadastrados. Para nomes novos, crie um novo agendamento.",
+              );
+            if (v.pacienteConvenioId)
+              throw new Error(
+                "Vincule os cadastros antes de informar um convênio.",
+              );
+            return api(
+              "/agendamentos-livres" + (a ? "/" + a.id : ""),
+              a ? "PUT" : "POST",
+              {
+                pacienteNome: v.pacienteId,
+                medicoNome: v.medicoId,
+                unidadeNome: v.unidadeId,
+                especialidadeNome: v.especialidadeId,
+                inicio: instante(v.inicio),
+                fim: instante(v.fim),
+                observacoes: v.observacoes,
+              },
+            );
+          }
+          return api(
+            "/agendamentos" + (a ? "/" + a.id : ""),
+            a ? "PUT" : "POST",
+            {
+              ...v,
+              ...ids,
+              pacienteConvenioId: v.pacienteConvenioId || null,
+              inicio: instante(v.inicio),
+              fim: instante(v.fim),
+            },
+          );
+        },
       });
     }, "");
   }
@@ -113,10 +171,16 @@ export function Agenda({ ctx }: { ctx: Contexto }) {
   }
   const mudar = (a: any, s: string) =>
     ctx.acao(() =>
-      api("/agendamentos/" + a.id + "/situacao", "PATCH", { situacao: s }),
+      api(
+        (a.livre ? "/agendamentos-livres/" : "/agendamentos/") +
+          a.id +
+          "/situacao",
+        "PATCH",
+        { situacao: s },
+      ),
     );
   const card = (a: any) => (
-    <div className="schedule-card" key={a.id}>
+    <div className="schedule-card" key={(a.livre ? "livre-" : "") + a.id}>
       <div className="schedule-top">
         <span>
           {hora(a.inicio)} – {hora(a.fim)}
@@ -125,12 +189,14 @@ export function Agenda({ ctx }: { ctx: Contexto }) {
       </div>
       <button
         className="patient-link"
-        onClick={() => ctx.navegar("paciente", a.pacienteId)}
+        onClick={() => !a.livre && ctx.navegar("paciente", a.pacienteId)}
+        disabled={a.livre}
       >
         {a.paciente.nome}
         <ArrowUpRight size={15} />
       </button>
       <p>{a.especialidade.nome}</p>
+      {a.livre && <p>Pré-agendamento · cadastros pendentes</p>}
       <small>
         {a.medico.profissional.nome} · {a.unidade.nome}
       </small>
@@ -148,9 +214,15 @@ export function Agenda({ ctx }: { ctx: Contexto }) {
                   campos: [],
                   botao: "Confirmar cancelamento",
                   submit: () =>
-                    api("/agendamentos/" + a.id + "/situacao", "PATCH", {
-                      situacao: "CANCELADO",
-                    }),
+                    api(
+                      (a.livre ? "/agendamentos-livres/" : "/agendamentos/") +
+                        a.id +
+                        "/situacao",
+                      "PATCH",
+                      {
+                        situacao: "CANCELADO",
+                      },
+                    ),
                 })
               }
             >
